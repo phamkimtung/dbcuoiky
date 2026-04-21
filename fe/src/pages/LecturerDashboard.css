@@ -1,0 +1,174 @@
+/* Lecturer Dashboard Styles */
+.lecturer-dashboard {
+    min-height: 100vh;
+    background-color: #f4f7f6;
+    padding: 20px;
+}
+
+.lecturer-dashboard header {
+    background: white;
+    padding: 1rem 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.lecturer-dashboard header h1 {
+    margin: 0;
+    color: #333;
+}
+
+.lecturer-dashboard header p {
+    margin: 0;
+    color: #666;
+}
+
+.lecturer-nav {
+    background: white;
+    padding: 1rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    margin-bottom: 20px;
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+}
+
+.lecturer-nav button {
+    background: #f8f9fa;
+    border: 1px solid #dee2e6;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 500;
+    color: #495057;
+    transition: all 0.2s;
+}
+
+.lecturer-nav button:hover,
+.lecturer-nav button.active {
+    background: #007bff;
+    color: white;
+    border-color: #007bff;
+}
+
+.lecturer-content {
+    background: white;
+    padding: 2rem;
+    border-radius: 8px;
+    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+}
+
+.message {
+    padding: 1rem;
+    margin-bottom: 1rem;
+    background: #d4edda;
+    color: #155724;
+    border: 1px solid #c3e6cb;
+    border-radius: 4px;
+}
+
+.section h2 {
+    margin-top: 0;
+    color: #333;
+    border-bottom: 2px solid #007bff;
+    padding-bottom: 0.5rem;
+}
+
+.section h3 {
+    color: #495057;
+    margin-top: 1rem;
+}
+
+.section h4 {
+    color: #495057;
+}
+
+.schedule-table {
+    overflow-x: auto;
+    margin-top: 1.5rem;
+}
+
+.schedule-table table,
+.grade-table table {
+    width: 100%;
+    border-collapse: collapse;
+    margin-top: 1rem;
+}
+
+.schedule-table table th,
+.grade-table table th {
+    background: #007bff;
+    color: white;
+    padding: 0.75rem;
+    text-align: left;
+    font-weight: 600;
+}
+
+.schedule-table table td,
+.grade-table table td {
+    padding: 0.75rem;
+    border-bottom: 1px solid #dee2e6;
+}
+
+.schedule-table table tbody tr:hover,
+.grade-table table tbody tr:hover {
+    background: #f8f9fa;
+}
+
+.grade-input-form {
+    background: #f8f9fa;
+    padding: 1.5rem;
+    border-radius: 4px;
+    margin-bottom: 2rem;
+}
+
+.grade-input-form form {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 1rem;
+    align-items: flex-end;
+}
+
+.grade-input-form select,
+.grade-input-form input {
+    flex: 1;
+    min-width: 200px;
+    padding: 0.5rem;
+    border: 1px solid #ced4da;
+    border-radius: 4px;
+}
+
+.grade-input-form button {
+    background: #28a745;
+    color: white;
+    border: none;
+    padding: 0.5rem 1rem;
+    border-radius: 4px;
+    cursor: pointer;
+    font-weight: 600;
+}
+
+.grade-input-form button:hover:not(:disabled) {
+    background: #218838;
+}
+
+.grade-input-form button:disabled {
+    background: #6c757d;
+    cursor: not-allowed;
+}
+
+.grade-table {
+    margin-top: 2rem;
+}
+
+.grade-table table {
+    font-size: 0.9rem;
+}
+
+.grade-table table tbody tr {
+    transition: background 0.2s;
+}
