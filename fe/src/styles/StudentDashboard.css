@@ -1,12 +1,11 @@
 /* ============================================
-   STUDENT DASHBOARD STYLES
+   STUDENT DASHBOARD — uses theme.css variables
    ============================================ */
 
 .student-dashboard {
     min-height: 100vh;
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    padding: 20px;
-    font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+    background: var(--page-bg);
+    font-family: 'Inter', 'Segoe UI', sans-serif;
 }
 
 /* ============================================
@@ -14,16 +13,17 @@
    ============================================ */
 
 .student-header {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     color: white;
-    padding: 30px 20px;
-    margin-bottom: 30px;
-    border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.1);
+    padding: 0 32px;
+    height: 68px;
+    margin-bottom: 0;
+    box-shadow: 0 2px 12px rgba(99,102,241,0.3);
 }
 
 .header-content {
-    max-width: 1200px;
+    height: 100%;
+    max-width: 1280px;
     margin: 0 auto;
     display: flex;
     justify-content: space-between;
@@ -31,38 +31,37 @@
 }
 
 .header-content h1 {
-    font-size: 2.5em;
+    font-size: 1.2rem;
     margin: 0;
     font-weight: 700;
+    color: white;
 }
 
 .welcome-text {
-    font-size: 1.1em;
-    margin: 10px 0 0 0;
-    opacity: 0.95;
+    font-size: 0.78rem;
+    margin: 4px 0 0;
+    opacity: 0.82;
+    color: white;
 }
 
 .logout-button {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
+    background: rgba(255,255,255,0.18);
     color: white;
-    border: none;
-    padding: 12px 24px;
-    border-radius: 8px;
-    font-size: 1em;
+    border: 1.5px solid rgba(255,255,255,0.35);
+    padding: 8px 18px;
+    border-radius: var(--radius-sm);
+    font-size: 0.88rem;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s ease;
-    box-shadow: 0 4px 15px rgba(245, 87, 108, 0.4);
+    transition: var(--transition);
 }
 
 .logout-button:hover {
-    transform: translateY(-2px);
-    box-shadow: 0 6px 20px rgba(245, 87, 108, 0.6);
+    background: rgba(255,255,255,0.28);
+    border-color: rgba(255,255,255,0.6);
 }
 
-.logout-button:active {
-    transform: translateY(0);
-}
+.logout-button:active { transform: none; }
 
 /* ============================================
    MESSAGE ALERTS
@@ -117,40 +116,44 @@
    ============================================ */
 
 .tabs {
-    max-width: 1200px;
-    margin: 0 auto 20px;
+    max-width: 1280px;
+    margin: 0 auto;
     display: flex;
-    gap: 10px;
+    gap: 4px;
     flex-wrap: wrap;
     background: white;
-    padding: 10px;
-    border-radius: 12px;
-    box-shadow: 0 2px 8px rgba(0, 0, 0, 0.1);
+    padding: 0 32px;
+    border-bottom: 2px solid var(--gray-100);
+    box-shadow: var(--shadow-sm);
 }
 
 .tab {
-    background: #f0f0f0;
-    border: 2px solid transparent;
-    color: #333;
-    padding: 12px 20px;
-    border-radius: 8px;
-    font-size: 0.95em;
-    font-weight: 600;
+    background: none;
+    border: none;
+    border-bottom: 2.5px solid transparent;
+    margin-bottom: -2px;
+    color: var(--gray-500);
+    padding: 15px 18px;
+    font-size: 0.88rem;
+    font-weight: 500;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: var(--transition);
     white-space: nowrap;
+    font-family: inherit;
 }
 
 .tab:hover {
-    background: #e0e0e0;
-    transform: translateY(-2px);
+    color: var(--primary);
+    background: var(--primary-bg);
+    border-radius: 6px 6px 0 0;
 }
 
 .tab.active {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
-    color: white;
-    border-color: #667eea;
-    box-shadow: 0 4px 12px rgba(102, 126, 234, 0.4);
+    color: var(--primary);
+    border-bottom-color: var(--primary);
+    font-weight: 600;
+    background: none;
+    box-shadow: none;
 }
 
 /* ============================================
@@ -158,137 +161,118 @@
    ============================================ */
 
 .tab-content {
-    max-width: 1200px;
+    max-width: 1280px;
     margin: 0 auto;
-    background: white;
-    padding: 40px;
-    border-radius: 12px;
-    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.15);
-    animation: fadeIn 0.3s ease;
+    padding: 28px 32px;
+    animation: fadeUp 0.25s ease;
 }
 
 .tab-content h2 {
-    color: #333;
+    color: var(--gray-800);
     margin-top: 0;
-    margin-bottom: 30px;
-    font-size: 1.8em;
-    border-bottom: 3px solid #667eea;
-    padding-bottom: 15px;
+    margin-bottom: 24px;
+    font-size: 1.2rem;
+    font-weight: 700;
+    border-bottom: 2px solid var(--gray-100);
+    padding-bottom: 14px;
 }
 
 .tab-content h3 {
-    color: #555;
-    margin-top: 30px;
-    margin-bottom: 20px;
-    font-size: 1.3em;
+    color: var(--gray-700);
+    margin-top: 28px;
+    margin-bottom: 16px;
+    font-size: 1rem;
+    font-weight: 600;
 }
 
-@keyframes fadeIn {
-    from {
-        opacity: 0;
-        transform: translateY(10px);
-    }
-    to {
-        opacity: 1;
-        transform: translateY(0);
-    }
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(10px); }
+    to   { opacity: 1; transform: translateY(0); }
 }
 
 /* ============================================
    OVERVIEW SECTION
    ============================================ */
 
-.overview-section {
-}
+.overview-section {}
 
 .stats-grid {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
-    gap: 20px;
-    margin-bottom: 40px;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 18px;
+    margin-bottom: 32px;
 }
 
 .stat-card {
-    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    background: linear-gradient(135deg, var(--primary) 0%, var(--primary-dark) 100%);
     color: white;
-    padding: 25px;
-    border-radius: 12px;
+    padding: 22px 24px;
+    border-radius: var(--radius-lg);
     display: flex;
     align-items: center;
-    gap: 20px;
-    box-shadow: 0 4px 15px rgba(102, 126, 234, 0.3);
-    transition: all 0.3s ease;
+    gap: 16px;
+    box-shadow: 0 4px 16px rgba(99,102,241,0.25);
+    transition: var(--transition);
 }
 
 .stat-card:hover {
-    transform: translateY(-5px);
-    box-shadow: 0 8px 25px rgba(102, 126, 234, 0.5);
+    transform: translateY(-4px);
+    box-shadow: 0 8px 28px rgba(99,102,241,0.35);
 }
 
-.stat-icon {
-    font-size: 3em;
-    min-width: 70px;
-}
+.stat-icon { font-size: 2.4rem; min-width: 60px; }
 
 .stat-info h3 {
-    margin: 0 0 10px 0;
-    font-size: 0.95em;
-    opacity: 0.9;
+    margin: 0 0 6px 0;
+    font-size: 0.8rem;
+    font-weight: 500;
+    opacity: 0.88;
     color: white;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
 }
 
 .stat-number {
     margin: 0;
-    font-size: 2em;
-    font-weight: 700;
+    font-size: 1.9rem;
+    font-weight: 800;
     color: #fff;
+    letter-spacing: -1px;
 }
 
 /* Quick Actions */
-
 .quick-actions {
-    background: #f8f9fa;
-    padding: 30px;
-    border-radius: 12px;
-    border-left: 4px solid #667eea;
+    background: var(--gray-50);
+    padding: 24px;
+    border-radius: var(--radius-lg);
+    border: 1px solid var(--gray-200);
+    margin-top: 8px;
 }
 
-.quick-actions h3 {
-    margin-top: 0;
-}
+.quick-actions h3 { margin-top: 0; }
 
 .action-buttons {
     display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(180px, 1fr));
-    gap: 15px;
+    grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+    gap: 14px;
 }
 
 .action-btn {
-    padding: 15px 20px;
+    padding: 18px 16px;
     border: none;
-    border-radius: 8px;
-    font-size: 1em;
+    border-radius: var(--radius);
+    font-size: 0.92rem;
     font-weight: 600;
     cursor: pointer;
-    transition: all 0.3s ease;
+    transition: var(--transition);
     color: white;
+    font-family: inherit;
 }
 
-.register-btn {
-    background: linear-gradient(135deg, #f093fb 0%, #f5576c 100%);
-}
-
-.timetable-btn {
-    background: linear-gradient(135deg, #4facfe 0%, #00f2fe 100%);
-}
-
-.grades-btn {
-    background: linear-gradient(135deg, #43e97b 0%, #38f9d7 100%);
-}
-
-.tuition-btn {
-    background: linear-gradient(135deg, #fa709a 0%, #fee140 100%);
-}
+.register-btn { background: linear-gradient(135deg, #f59e0b 0%, #d97706 100%); box-shadow: 0 2px 8px rgba(245,158,11,0.3); }
+.timetable-btn { background: linear-gradient(135deg, #3b82f6 0%, #2563eb 100%); box-shadow: 0 2px 8px rgba(59,130,246,0.3); }
+.grades-btn { background: linear-gradient(135deg, var(--success) 0%, #059669 100%); box-shadow: 0 2px 8px rgba(16,185,129,0.3); }
+.tuition-btn { background: linear-gradient(135deg, #8b5cf6 0%, #7c3aed 100%); box-shadow: 0 2px 8px rgba(139,92,246,0.3); }
 
 .action-btn:hover {
     transform: translateY(-3px);
