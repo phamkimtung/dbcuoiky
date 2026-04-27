@@ -1,0 +1,614 @@
+-- =========================
+-- ROLES & USERS
+-- =========================
+CREATE TABLE roles (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(50) NOT NULL
+);
+
+CREATE TABLE users (
+    id SERIAL PRIMARY KEY,
+    name VARCHAR(255),
+    email VARCHAR(255) UNIQUE,
+    password VARCHAR(255),
+    role_id INT,
+    is_active BOOLEAN DEFAULT TRUE,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_users_role 
+        FOREIGN KEY (role_id) 
+        REFERENCES roles(id)
+        ON DELETE RESTRICT -- Đổi thành RESTRICT
+);
+
+-- =========================
+-- ACADEMIC STRUCTURE
+-- =========================
+CREATE TABLE faculties (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(50) UNIQUE,
+    name VARCHAR(255)
+);
+
+CREATE TABLE majors (
+    id SERIAL PRIMARY KEY,
+    faculty_id INT,
+    code VARCHAR(50) UNIQUE,
+    name VARCHAR(255),
+    CONSTRAINT fk_majors_faculty 
+        FOREIGN KEY (faculty_id) 
+        REFERENCES faculties(id)
+        ON DELETE RESTRICT -- Đổi thành RESTRICT
+);
+
+CREATE TABLE students (
+    id SERIAL PRIMARY KEY,
+    user_id INT UNIQUE,
+    student_code VARCHAR(50) UNIQUE,
+    major_id INT,
+    admission_year INT,
+    deleted_at TIMESTAMP DEFAULT NULL, -- Thêm Soft Delete
+    CONSTRAINT fk_students_user 
+        FOREIGN KEY (user_id) 
+        REFERENCES users(id)
+        ON DELETE RESTRICT, -- Đổi thành RESTRICT
+    CONSTRAINT fk_students_major 
+        FOREIGN KEY (major_id) 
+        REFERENCES majors(id)
+        ON DELETE RESTRICT -- Đổi thành RESTRICT
+);
+
+CREATE TABLE lecturers (
+    id SERIAL PRIMARY KEY,
+    user_id INT UNIQUE,
+    faculty_id INT,
+    CONSTRAINT fk_lecturers_user 
+        FOREIGN KEY (user_id) 
+        REFERENCES users(id)
+        ON DELETE RESTRICT, -- Đổi thành RESTRICT
+    CONSTRAINT fk_lecturers_faculty 
+        FOREIGN KEY (faculty_id) 
+        REFERENCES faculties(id)
+        ON DELETE RESTRICT -- Đổi thành RESTRICT
+);
+
+-- =========================
+-- COURSES & PREREQUISITES
+-- =========================
+CREATE TABLE courses (
+    id SERIAL PRIMARY KEY,
+    course_code VARCHAR(50) UNIQUE,
+    name VARCHAR(255),
+    credits INT CHECK (credits > 0),
+    credit_price FLOAT
+);
+
+CREATE TABLE prerequisites (
+    id SERIAL PRIMARY KEY,
+    course_id INT,
+    prerequisite_id INT,
+    CONSTRAINT fk_pre_course 
+        FOREIGN KEY (course_id) 
+        REFERENCES courses(id)
+        ON DELETE RESTRICT, -- Đổi thành RESTRICT
+    CONSTRAINT fk_pre_req 
+        FOREIGN KEY (prerequisite_id) 
+        REFERENCES courses(id)
+        ON DELETE RESTRICT -- Đổi thành RESTRICT
+);
+
+-- =========================
+-- SEMESTERS & CLASSES
+-- =========================
+CREATE TABLE semesters (
+    id SERIAL PRIMARY KEY,
+    code VARCHAR(20) UNIQUE,
+    year INT,
+    start_date DATE,
+    end_date DATE,
+    reg_start_time TIMESTAMP,
+    reg_end_time TIMESTAMP
+);
+
+CREATE TABLE classes (
+    id SERIAL PRIMARY KEY,
+    course_id INT,
+    lecturer_id INT,
+    semester_id INT,
+    status VARCHAR(20),
+    max_students INT,
+    CONSTRAINT fk_classes_course 
+        FOREIGN KEY (course_id) 
+        REFERENCES courses(id)
+        ON DELETE RESTRICT, -- Đổi thành RESTRICT
+    CONSTRAINT fk_classes_lecturer 
+        FOREIGN KEY (lecturer_id) 
+        REFERENCES lecturers(id)
+        ON DELETE RESTRICT, -- Đổi thành RESTRICT
+    CONSTRAINT fk_classes_semester 
+        FOREIGN KEY (semester_id) 
+        REFERENCES semesters(id)
+        ON DELETE RESTRICT -- Đổi thành RESTRICT
+);
+
+CREATE TABLE schedules (
+    id SERIAL PRIMARY KEY,
+    class_id INT,
+    day_of_week INT CHECK (day_of_week BETWEEN 2 AND 8),
+    start_time TIME,
+    end_time TIME,
+    room VARCHAR(50),
+    CONSTRAINT fk_schedule_class 
+        FOREIGN KEY (class_id) 
+        REFERENCES classes(id)
+        ON DELETE CASCADE -- Giữ CASCADE vì là cha-con
+);
+
+-- =========================
+-- ENROLLMENTS
+-- =========================
+CREATE TABLE enrollments (
+    id SERIAL PRIMARY KEY,
+    student_id INT,
+    class_id INT,
+    status VARCHAR(20),
+    enrolled_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_enroll_student 
+        FOREIGN KEY (student_id) 
+        REFERENCES students(id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_enroll_class 
+        FOREIGN KEY (class_id) 
+        REFERENCES classes(id)
+        ON DELETE CASCADE,
+    CONSTRAINT unique_student_class UNIQUE (student_id, class_id)
+);
+
+-- =========================
+-- GRADES
+-- =========================
+CREATE TABLE grade_components (
+    id SERIAL PRIMARY KEY,
+    course_id INT,
+    name VARCHAR(100),
+    weight FLOAT,
+    CONSTRAINT fk_gc_course 
+        FOREIGN KEY (course_id) 
+        REFERENCES courses(id)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE grade_results (
+    id SERIAL PRIMARY KEY,
+    enrollment_id INT,
+    component_id INT,
+    score FLOAT CHECK (score BETWEEN 0 AND 10),
+    CONSTRAINT fk_gr_enroll 
+        FOREIGN KEY (enrollment_id) 
+        REFERENCES enrollments(id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_gr_component 
+        FOREIGN KEY (component_id) 
+        REFERENCES grade_components(id)
+        ON DELETE CASCADE
+);
+
+CREATE TABLE final_grades (
+    id SERIAL PRIMARY KEY,
+    enrollment_id INT UNIQUE,
+    total_score FLOAT,
+    letter_grade VARCHAR(5),
+    is_passed BOOLEAN,
+    is_locked BOOLEAN DEFAULT FALSE,
+    CONSTRAINT fk_fg_enroll 
+        FOREIGN KEY (enrollment_id) 
+        REFERENCES enrollments(id)
+        ON DELETE CASCADE
+);
+
+-- =========================
+-- TUITION
+-- =========================
+CREATE TABLE tuition_invoices (
+    id SERIAL PRIMARY KEY,
+    student_id INT,
+    semester_id INT,
+    total_amount FLOAT,
+    paid_amount FLOAT DEFAULT 0,
+    status VARCHAR(20),
+    due_date DATE,
+    CONSTRAINT fk_tuition_student 
+        FOREIGN KEY (student_id) 
+        REFERENCES students(id)
+        ON DELETE CASCADE,
+    CONSTRAINT fk_tuition_semester 
+        FOREIGN KEY (semester_id) 
+        REFERENCES semesters(id)
+        ON DELETE RESTRICT,
+    CONSTRAINT unique_student_semester UNIQUE (student_id, semester_id)
+);
+
+CREATE TABLE payment_transactions (
+    id SERIAL PRIMARY KEY,
+    invoice_id INT,
+    amount FLOAT,
+    payment_method VARCHAR(50),
+    paid_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    status VARCHAR(20),
+    CONSTRAINT fk_payment_invoice 
+        FOREIGN KEY (invoice_id) 
+        REFERENCES tuition_invoices(id)
+        ON DELETE CASCADE
+);
+
+-- =========================
+-- AUDIT LOGS
+-- =========================
+CREATE TABLE audit_logs (
+    id SERIAL PRIMARY KEY,
+    user_id INT,
+    action VARCHAR(255),
+    description TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    CONSTRAINT fk_audit_user 
+        FOREIGN KEY (user_id) 
+        REFERENCES users(id)
+        ON DELETE CASCADE
+);
+
+-- =========================
+-- INDEXES
+-- =========================
+CREATE INDEX idx_users_email ON users(email);
+CREATE INDEX idx_students_code ON students(student_code);
+CREATE INDEX idx_courses_code ON courses(course_code);
+CREATE INDEX idx_enrollments_student ON enrollments(student_id);
+CREATE INDEX idx_enrollments_class ON enrollments(class_id);
+CREATE INDEX idx_classes_course ON classes(course_id);
+CREATE INDEX idx_grade_results_enroll ON grade_results(enrollment_id);
+CREATE INDEX idx_payment_invoice ON payment_transactions(invoice_id);
+
+-- Các Index mới bổ sung
+CREATE INDEX idx_schedules_class ON schedules(class_id);
+CREATE INDEX idx_prerequisites_course ON prerequisites(course_id);
+CREATE INDEX idx_enrollments_semester ON enrollments(student_id, class_id);
+
+
+-- =========================
+-- TRIGGERS & FUNCTIONS
+-- =========================
+
+-- 1. Cập nhật kiểm tra trùng lịch (Xét theo cùng học kỳ)
+CREATE OR REPLACE FUNCTION check_schedule_conflict()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_semester_id INT;
+BEGIN
+    -- Lấy học kỳ của lớp học đang định đăng ký
+    SELECT semester_id INTO v_semester_id FROM classes WHERE id = NEW.class_id;
+
+    IF EXISTS (
+        SELECT 1
+        FROM enrollments e
+        JOIN classes c ON e.class_id = c.id
+        JOIN schedules s ON c.id = s.class_id
+        WHERE e.student_id = NEW.student_id
+        AND e.status != 'dropped'
+        AND c.semester_id = v_semester_id -- Chỉ kiểm tra các lớp trong cùng học kỳ
+        AND EXISTS (
+            SELECT 1 FROM schedules s2
+            WHERE s2.class_id = NEW.class_id
+            AND s.day_of_week = s2.day_of_week
+            AND (s.start_time < s2.end_time AND s.end_time > s2.start_time)
+        )
+    ) THEN
+        RAISE EXCEPTION 'Phát hiện trùng lịch học trong học kỳ!';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_check_schedule
+BEFORE INSERT ON enrollments
+FOR EACH ROW EXECUTE FUNCTION check_schedule_conflict();
+
+
+-- 2. Kiểm tra sĩ số (có khoá row)
+CREATE OR REPLACE FUNCTION check_class_capacity()
+RETURNS TRIGGER AS $$
+DECLARE
+    current_count INT;
+    max_count INT;
+BEGIN
+    SELECT max_students INTO max_count
+    FROM classes
+    WHERE id = NEW.class_id
+    FOR UPDATE;
+
+    SELECT COUNT(*) INTO current_count
+    FROM enrollments
+    WHERE class_id = NEW.class_id
+    AND status != 'dropped';
+
+    IF current_count >= max_count THEN
+        RAISE EXCEPTION 'Class is full!';
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_check_capacity
+BEFORE INSERT ON enrollments
+FOR EACH ROW EXECUTE FUNCTION check_class_capacity();
+
+
+-- 3. Kiểm tra môn tiên quyết
+CREATE OR REPLACE FUNCTION check_prerequisites()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF EXISTS (
+        SELECT 1
+        FROM prerequisites p
+        WHERE p.course_id = (SELECT course_id FROM classes WHERE id = NEW.class_id)
+        AND NOT EXISTS (
+            SELECT 1
+            FROM enrollments e
+            JOIN final_grades fg ON e.id = fg.enrollment_id
+            JOIN classes c ON e.class_id = c.id
+            WHERE e.student_id = NEW.student_id
+            AND c.course_id = p.prerequisite_id
+            AND fg.is_passed = TRUE
+        )
+    ) THEN
+        RAISE EXCEPTION 'Prerequisite not satisfied!';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_check_prerequisite
+BEFORE INSERT ON enrollments
+FOR EACH ROW EXECUTE FUNCTION check_prerequisites();
+
+
+-- 4. Kiểm tra thời gian đăng ký
+CREATE OR REPLACE FUNCTION check_registration_time()
+RETURNS TRIGGER AS $$
+DECLARE
+    start_time TIMESTAMP;
+    end_time TIMESTAMP;
+BEGIN
+    SELECT s.reg_start_time, s.reg_end_time
+    INTO start_time, end_time
+    FROM classes c
+    JOIN semesters s ON c.semester_id = s.id
+    WHERE c.id = NEW.class_id;
+
+    IF CURRENT_TIMESTAMP < start_time OR CURRENT_TIMESTAMP > end_time THEN
+        RAISE EXCEPTION 'Registration is closed!';
+    END IF;
+
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_check_reg_time
+BEFORE INSERT ON enrollments
+FOR EACH ROW EXECUTE FUNCTION check_registration_time();
+
+
+-- 5. Cập nhật tính điểm tổng kết (Hỗ trợ Delete)
+CREATE OR REPLACE FUNCTION calculate_final_grade()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_target_enrollment_id INT;
+    v_total_score FLOAT;
+    v_letter_grade VARCHAR(5);
+BEGIN
+    v_target_enrollment_id := COALESCE(NEW.enrollment_id, OLD.enrollment_id);
+
+    SELECT ROUND(
+        (SUM(gr.score * gc.weight) / NULLIF(SUM(gc.weight), 0))::numeric,
+        2
+    )
+    INTO v_total_score
+    FROM grade_results gr
+    JOIN grade_components gc ON gr.component_id = gc.id
+    WHERE gr.enrollment_id = v_target_enrollment_id;
+
+    -- Nếu bị xoá hết điểm, v_total_score sẽ NULL
+    IF v_total_score IS NULL THEN
+        DELETE FROM final_grades WHERE enrollment_id = v_target_enrollment_id;
+        RETURN NULL;
+    END IF;
+
+    IF v_total_score >= 9 THEN v_letter_grade := 'A+';
+    ELSIF v_total_score >= 8.5 THEN v_letter_grade := 'A';
+    ELSIF v_total_score >= 8 THEN v_letter_grade := 'B+';
+    ELSIF v_total_score >= 7 THEN v_letter_grade := 'B';
+    ELSIF v_total_score >= 6.5 THEN v_letter_grade := 'C+';
+    ELSIF v_total_score >= 6 THEN v_letter_grade := 'C';
+    ELSIF v_total_score >= 5 THEN v_letter_grade := 'D+';
+    ELSIF v_total_score >= 4 THEN v_letter_grade := 'D';
+    ELSE v_letter_grade := 'F';
+    END IF;
+
+    INSERT INTO final_grades (enrollment_id, total_score, letter_grade, is_passed)
+    VALUES (
+        v_target_enrollment_id,
+        v_total_score,
+        v_letter_grade,
+        (v_total_score >= 4.0)
+    )
+    ON CONFLICT (enrollment_id)
+    DO UPDATE SET
+        total_score = EXCLUDED.total_score,
+        letter_grade = EXCLUDED.letter_grade,
+        is_passed = (EXCLUDED.total_score >= 4.0);
+
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_calc_final
+AFTER INSERT OR UPDATE OR DELETE ON grade_results
+FOR EACH ROW EXECUTE FUNCTION calculate_final_grade();
+
+
+-- 6. Không cho sửa điểm nếu đã khoá
+CREATE OR REPLACE FUNCTION prevent_grade_update()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM final_grades
+        WHERE enrollment_id = NEW.enrollment_id
+        AND is_locked = TRUE
+    ) THEN
+        RAISE EXCEPTION 'Điểm đã bị khóa!';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_prevent_grade_update
+BEFORE INSERT OR UPDATE ON grade_results
+FOR EACH ROW EXECUTE FUNCTION prevent_grade_update();
+
+
+-- 7. Cập nhật trạng thái hoá đơn khi thanh toán (Thêm Overpaid)
+CREATE OR REPLACE FUNCTION update_invoice_status()
+RETURNS TRIGGER AS $$
+DECLARE
+    total_paid FLOAT;
+    target_invoice_id INT;
+BEGIN
+    target_invoice_id := COALESCE(NEW.invoice_id, OLD.invoice_id);
+
+    SELECT COALESCE(SUM(amount), 0) INTO total_paid
+    FROM payment_transactions
+    WHERE invoice_id = target_invoice_id;
+
+    UPDATE tuition_invoices
+    SET paid_amount = total_paid,
+        status = CASE
+            WHEN total_paid > total_amount THEN 'overpaid' -- Thanh toán thừa
+            WHEN total_paid = total_amount THEN 'paid'
+            WHEN total_paid > 0 THEN 'partial'
+            ELSE 'unpaid'
+        END
+    WHERE id = target_invoice_id;
+
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_update_invoice
+AFTER INSERT OR UPDATE OR DELETE ON payment_transactions
+FOR EACH ROW EXECUTE FUNCTION update_invoice_status();
+
+
+-- 8. Tự động cập nhật học phí & check trạng thái khi đăng ký/huỷ môn
+CREATE OR REPLACE FUNCTION update_tuition_on_enrollment()
+RETURNS TRIGGER AS $$
+DECLARE
+    v_semester_id INT;
+    v_cost FLOAT;
+    target_student_id INT;
+BEGIN
+    SELECT c.semester_id, (co.credits * co.credit_price)
+    INTO v_semester_id, v_cost
+    FROM classes c
+    JOIN courses co ON c.course_id = co.id
+    WHERE c.id = COALESCE(NEW.class_id, OLD.class_id);
+    
+    target_student_id := COALESCE(NEW.student_id, OLD.student_id);
+
+    IF TG_OP = 'INSERT' OR (TG_OP = 'UPDATE' AND OLD.status = 'dropped' AND NEW.status != 'dropped') THEN
+        INSERT INTO tuition_invoices (student_id, semester_id, total_amount, paid_amount, status)
+        VALUES (NEW.student_id, v_semester_id, v_cost, 0, 'unpaid')
+        ON CONFLICT (student_id, semester_id)
+        DO UPDATE SET 
+            total_amount = tuition_invoices.total_amount + EXCLUDED.total_amount,
+            status = CASE
+                WHEN tuition_invoices.paid_amount > (tuition_invoices.total_amount + EXCLUDED.total_amount) THEN 'overpaid'
+                WHEN tuition_invoices.paid_amount = (tuition_invoices.total_amount + EXCLUDED.total_amount) THEN 'paid'
+                WHEN tuition_invoices.paid_amount > 0 THEN 'partial'
+                ELSE 'unpaid'
+            END;
+
+    ELSIF TG_OP = 'DELETE' OR (TG_OP = 'UPDATE' AND NEW.status = 'dropped' AND OLD.status != 'dropped') THEN
+        UPDATE tuition_invoices
+        SET total_amount = GREATEST(total_amount - v_cost, 0),
+            status = CASE
+                WHEN paid_amount > GREATEST(total_amount - v_cost, 0) THEN 'overpaid'
+                WHEN paid_amount = GREATEST(total_amount - v_cost, 0) THEN 'paid'
+                WHEN paid_amount > 0 THEN 'partial'
+                ELSE 'unpaid'
+            END
+        WHERE student_id = target_student_id
+        AND semester_id = v_semester_id;
+    END IF;
+
+    RETURN NULL;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_update_tuition
+AFTER INSERT OR UPDATE OR DELETE ON enrollments
+FOR EACH ROW EXECUTE FUNCTION update_tuition_on_enrollment();
+
+
+-- 9. Ghi log khi thay đổi điểm
+CREATE OR REPLACE FUNCTION log_grade_changes()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF OLD.score IS DISTINCT FROM NEW.score THEN
+        INSERT INTO audit_logs (user_id, action, description)
+        VALUES (
+            NULL,  -- Nếu có session có thể lấy current_setting('myapp.user_id')
+            'UPDATE_GRADE',
+            FORMAT('Đổi điểm component %s của enrollment %s từ %s thành %s', 
+                   NEW.component_id, NEW.enrollment_id, OLD.score, NEW.score)
+        );
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_audit_grade_changes
+AFTER UPDATE ON grade_results
+FOR EACH ROW EXECUTE FUNCTION log_grade_changes();
+
+
+-- 10. Kiểm tra sinh viên còn hoạt động (Xét thêm Soft Delete)
+CREATE OR REPLACE FUNCTION check_student_active()
+RETURNS TRIGGER AS $$
+BEGIN
+    IF EXISTS (
+        SELECT 1 FROM students s 
+        JOIN users u ON s.user_id = u.id 
+        WHERE s.id = NEW.student_id AND (u.is_active = FALSE OR s.deleted_at IS NOT NULL)
+    ) THEN
+        RAISE EXCEPTION 'Sinh viên đang ở trạng thái không hoạt động hoặc đã bị xoá, không thể đăng ký học!';
+    END IF;
+    RETURN NEW;
+END;
+$$ LANGUAGE plpgsql;
+
+CREATE TRIGGER trg_check_student_active
+BEFORE INSERT ON enrollments
+FOR EACH ROW EXECUTE FUNCTION check_student_active();
+
+-- 11. Materialized view tổng kết sinh viên
+CREATE MATERIALIZED VIEW student_summary AS
+SELECT 
+    s.id AS student_id,
+    COUNT(e.id) AS total_courses,
+    AVG(fg.total_score) AS avg_score
+FROM students s
+JOIN enrollments e ON s.id = e.student_id
+JOIN final_grades fg ON e.id = fg.enrollment_id
+WHERE s.deleted_at IS NULL
+GROUP BY s.id;
+
+

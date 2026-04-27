@@ -16,7 +16,9 @@ const PrivateRoute = ({ children, allowedRoles }) => {
   }
 
   // Nếu đã đăng nhập nhưng không có quyền, chuyển về trang login
-  if (!allowedRoles.includes(user.role)) {
+  const userRole = user.role.toLowerCase();
+  const allowedRolesLower = allowedRoles.map(role => role.toLowerCase());
+  if (!allowedRolesLower.includes(userRole)) {
     return <Navigate to="/login" />;
   }
 

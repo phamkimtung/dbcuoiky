@@ -77,12 +77,13 @@ app.post('/login', async (req, res) => {
         if (password !== user.password) return res.status(400).json({ message: 'Wrong password' });
 
         let profile = null;
-        if (user.role === 'student') {
+        const roleLower = user.role.toLowerCase();
+        if (roleLower === 'student') {
             const studentRes = await pool.query('SELECT * FROM students WHERE user_id = $1', [user.id]);
-            profile = studentRes.rows[0];
-        } else if (user.role === 'lecturer') {
+            profile = studentRes.rows[0] || null;
+        } else if (roleLower === 'lecturer') {
             const lecRes = await pool.query('SELECT * FROM lecturers WHERE user_id = $1', [user.id]);
-            profile = lecRes.rows[0];
+            profile = lecRes.rows[0] || null;
         }
 
         const token = jwt.sign({ id: user.id, role: user.role }, JWT_SECRET, { expiresIn: '1d' });
@@ -534,18 +535,18 @@ app.post('/lecturer/grades', async (req, res) => {
     try {
         // Kiểm tra xem đã có điểm chưa, nếu có thì UPDATE, chưa có thì INSERT
         const check = await pool.query(`SELECT id FROM grade_results WHERE enrollment_id = $1 AND component_id = $2`, [enrollment_id, component_id]);
-        
+
         if (check.rows.length > 0) {
             // DB Trigger trg_prevent_grade_update sẽ chặn nếu điểm đã bị khoá
             await pool.query(`UPDATE grade_results SET score = $1 WHERE id = $2`, [score, check.rows[0].id]);
         } else {
             await pool.query(`INSERT INTO grade_results(enrollment_id, component_id, score) VALUES($1, $2, $3)`, [enrollment_id, component_id, score]);
         }
-        
+
         res.json({ message: 'Grade updated successfully' });
-    } catch (err) { 
+    } catch (err) {
         // Lỗi từ các DB Triggers (vd: "Điểm đã bị khóa!") sẽ được bắt ở đây
-        res.status(400).json({ error: err.message }); 
+        res.status(400).json({ error: err.message });
     }
 });
 
@@ -576,6 +577,20 @@ app.get('/lecturer/classes/:class_id/grades', async (req, res) => {
 /* =========================================================
    🎓 ACTOR 3: STUDENT APIs
    ========================================================= */
+
+/**
+ * 0. Lấy student profile theo user_id (dùng khi profile_id bị thiếu)
+ */
+app.get('/student/profile-by-user/:user_id', async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT s.*, u.name, u.email FROM students s JOIN users u ON s.user_id = u.id WHERE s.user_id = $1`,
+            [req.params.user_id]
+        );
+        if (result.rows.length === 0) return res.status(404).json({ message: 'Student not found' });
+        res.json(result.rows[0]);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 /**
  * 1. Xem danh sách các lớp đang mở trong kỳ (Để đăng ký)
@@ -631,6 +646,30 @@ app.delete('/student/:student_id/enroll/:class_id', async (req, res) => {
     } catch (err) {
         res.status(400).json({ error: err.message });
     }
+});
+
+/**
+ * 3b. Lấy danh sách lớp đã đăng ký của sinh viên
+ */
+app.get('/student/:id/enrolled-classes', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT e.id AS enrollment_id, e.class_id, co.course_code, co.name AS course_name, 
+                   co.credits, u.name AS lecturer_name,
+                   s.day_of_week, s.start_time, s.end_time, s.room,
+                   se.code AS semester_code, e.status
+            FROM enrollments e
+            JOIN classes c ON e.class_id = c.id
+            JOIN courses co ON c.course_id = co.id
+            JOIN schedules s ON c.id = s.class_id
+            JOIN lecturers l ON c.lecturer_id = l.id
+            JOIN users u ON l.user_id = u.id
+            JOIN semesters se ON c.semester_id = se.id
+            WHERE e.student_id = $1 AND e.status != 'dropped'
+            ORDER BY se.start_date DESC, s.day_of_week
+        `, [req.params.id]);
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 /**

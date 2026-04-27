@@ -34,27 +34,31 @@ const LoginPage = () => {
             }
 
             // Lưu token và thông tin người dùng vào localStorage
+            // data.profile chứa student/lecturer id từ bảng tương ứng
             const userData = {
                 token: data.token,
-                id: data.user.id,
+                id: data.user.id,           // users.id
+                profile_id: data.profile?.id || null, // students.id hoặc lecturers.id
                 name: data.user.name,
                 email: data.user.email,
-                role: data.user.role
+                role: data.user.role,
+                student_code: data.profile?.student_code || null
             };
             localStorage.setItem('user', JSON.stringify(userData));
             console.log('User data stored in localStorage:', userData);
 
             // Chuyển hướng dựa trên vai trò
-            switch (data.user.role) {
-                case 'Admin':
+            const role = data.user.role.toLowerCase();
+            switch (role) {
+                case 'admin':
                     console.log('Redirecting to admin dashboard');
                     navigate('/admin');
                     break;
-                case 'Lecturer':
+                case 'lecturer':
                     console.log('Redirecting to lecturer dashboard');
                     navigate('/lecturer');
                     break;
-                case 'Student':
+                case 'student':
                     console.log('Redirecting to student dashboard');
                     navigate('/student');
                     break;
