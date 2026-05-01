@@ -5,7 +5,8 @@ import './AdminDashboard.css';
 const AdminDashboard = () => {
     const navigate = useNavigate();
     const user = JSON.parse(localStorage.getItem('user'));
-    const [activeTab, setActiveTab] = useState('faculties');
+    const [activeTab, setActiveTab] = useState('stats');
+    const [stats, setStats] = useState(null);
 
     // States for data
     const [faculties, setFaculties] = useState([]);
@@ -34,6 +35,12 @@ const AdminDashboard = () => {
     const API_BASE = 'http://localhost:3000';
 
     // Fetch functions
+    const fetchStats = async () => {
+        const res = await fetch(`${API_BASE}/admin/stats`);
+        const data = await res.json();
+        setStats(data);
+    };
+
     const fetchFaculties = async () => {
         const res = await fetch(`${API_BASE}/admin/faculties`);
         const data = await res.json();
@@ -95,6 +102,7 @@ const AdminDashboard = () => {
     };
 
     useEffect(() => {
+        fetchStats();
         fetchFaculties();
         fetchMajors();
         fetchCourses();
@@ -224,6 +232,20 @@ const AdminDashboard = () => {
         navigate('/login');
     };
 
+    const handleStatusUpdate = async (classId, newStatus) => {
+        try {
+            const res = await fetch(`${API_BASE}/admin/classes/${classId}/status`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ status: newStatus })
+            });
+            if (res.ok) { fetchClasses(); fetchStats(); }
+            else alert('Cập nhật thất bại');
+        } catch { alert('Lỗi kết nối'); }
+    };
+
+    const formatVND = (n) => new Intl.NumberFormat('vi-VN',{style:'currency',currency:'VND'}).format(n||0);
+
     return (
         <div className="admin-dashboard">
             <header>
@@ -233,6 +255,7 @@ const AdminDashboard = () => {
             </header>
 
             <nav className="admin-nav">
+                <button onClick={() => setActiveTab('stats')} className={activeTab === 'stats' ? 'active' : ''}>📊 Thống Kê</button>
                 <button onClick={() => setActiveTab('faculties')} className={activeTab === 'faculties' ? 'active' : ''}>Khoa</button>
                 <button onClick={() => setActiveTab('majors')} className={activeTab === 'majors' ? 'active' : ''}>Chuyên ngành</button>
                 <button onClick={() => setActiveTab('courses')} className={activeTab === 'courses' ? 'active' : ''}>Môn học</button>
@@ -245,6 +268,37 @@ const AdminDashboard = () => {
             </nav>
 
             <main className="admin-content">
+                {activeTab === 'stats' && (
+                    <div className="section">
+                        <h2>📊 Thống Kê Tổng Quan</h2>
+                        {stats ? (
+                            <div>
+                                <div style={{display:'grid',gridTemplateColumns:'repeat(auto-fit,minmax(200px,1fr))',gap:'20px',marginBottom:'32px'}}>
+                                    {[{icon:'🎓',label:'Tổng Sinh Viên',val:stats.total_students,color:'#6366f1'},
+                                      {icon:'👨‍🏫',label:'Tổng Giảng Viên',val:stats.total_lecturers,color:'#0ea5e9'},
+                                      {icon:'📚',label:'Tổng Lớp Học',val:stats.total_classes,color:'#8b5cf6'},
+                                      {icon:'🟢',label:'Lớp Đang Mở',val:stats.open_classes,color:'#16a34a'},
+                                      {icon:'💰',label:'Tổng Học Phí',val:formatVND(stats.total_revenue),color:'#d97706'},
+                                      {icon:'✅',label:'Đã Thu',val:formatVND(stats.paid_revenue),color:'#059669'},
+                                    ].map((s,i) => (
+                                        <div key={i} style={{background:`linear-gradient(135deg,${s.color}22,${s.color}11)`,border:`2px solid ${s.color}44`,borderRadius:'16px',padding:'24px',textAlign:'center'}}>
+                                            <div style={{fontSize:'2.2rem',marginBottom:'8px'}}>{s.icon}</div>
+                                            <div style={{fontSize:'1.8rem',fontWeight:800,color:s.color}}>{s.val}</div>
+                                            <div style={{fontSize:'0.85rem',color:'#6b7280',marginTop:'4px',fontWeight:500}}>{s.label}</div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <div style={{background:'#f0fdf4',border:'2px solid #bbf7d0',borderRadius:'12px',padding:'20px'}}>
+                                    <strong style={{color:'#16a34a'}}>💡 Tỉ lệ thu học phí: </strong>
+                                    <span style={{fontWeight:700}}>
+                                        {stats.total_revenue > 0 ? ((stats.paid_revenue/stats.total_revenue)*100).toFixed(1) : 0}%
+                                    </span>
+                                    <span style={{color:'#6b7280',marginLeft:'8px'}}>({formatVND(stats.total_revenue - stats.paid_revenue)} chưa thu)</span>
+                                </div>
+                            </div>
+                        ) : <p>Đang tải...</p>}
+                    </div>
+                )}
                 {activeTab === 'faculties' && (
                     <div className="section">
                         <h2>Quản lý Khoa</h2>
@@ -368,9 +422,33 @@ const AdminDashboard = () => {
                             <input type="number" placeholder="Sĩ số tối đa" value={classForm.max_students} onChange={e => setClassForm({...classForm, max_students: e.target.value})} required />
                             <button type="submit">Thêm Lớp học phần</button>
                         </form>
-                        <ul>
-                            {classes.map(c => <li key={c.id}>{c.course_name} - {c.lecturer_name} ({c.semester})</li>)}
-                        </ul>
+                        <table style={{width:'100%',borderCollapse:'collapse',marginTop:'20px'}}>
+                            <thead style={{background:'#6366f1',color:'white'}}>
+                                <tr><th style={{padding:'12px',textAlign:'left'}}>Môn học</th><th style={{padding:'12px',textAlign:'left'}}>Giảng viên</th><th style={{padding:'12px',textAlign:'left'}}>Học kỳ</th><th style={{padding:'12px',textAlign:'left'}}>Trạng thái</th><th style={{padding:'12px',textAlign:'left'}}>Đổi trạng thái</th></tr>
+                            </thead>
+                            <tbody>
+                                {classes.map(c => {
+                                    const statusColors = {planned:'#6b7280',open:'#16a34a',closed:'#dc2626'};
+                                    return (
+                                        <tr key={c.id} style={{borderBottom:'1px solid #e5e7eb'}}>
+                                            <td style={{padding:'12px'}}>{c.course_name}</td>
+                                            <td style={{padding:'12px'}}>{c.lecturer_name}</td>
+                                            <td style={{padding:'12px'}}>{c.semester}</td>
+                                            <td style={{padding:'12px'}}>
+                                                <span style={{background:statusColors[c.status]||'#6b7280',color:'white',padding:'3px 10px',borderRadius:'12px',fontSize:'0.82rem',fontWeight:600}}>{c.status}</span>
+                                            </td>
+                                            <td style={{padding:'12px'}}>
+                                                <select value={c.status} onChange={e=>handleStatusUpdate(c.id,e.target.value)} style={{padding:'5px 8px',borderRadius:'6px',border:'1.5px solid #e5e7eb',fontSize:'0.85rem',cursor:'pointer'}}>
+                                                    <option value="planned">planned</option>
+                                                    <option value="open">open</option>
+                                                    <option value="closed">closed</option>
+                                                </select>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
                     </div>
                 )}
 

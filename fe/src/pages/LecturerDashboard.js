@@ -16,6 +16,8 @@ const LecturerDashboard = () => {
     const [gradeForm, setGradeForm] = useState({ enrollment_id: '', component_id: '', score: '' });
     const [loading, setLoading] = useState(false);
     const [message, setMessage] = useState('');
+    const [isClassLocked, setIsClassLocked] = useState(false);
+    const [pwForm, setPwForm] = useState({ old_password: '', new_password: '', confirm_password: '' });
 
     const API_BASE = 'http://localhost:3000';
 
@@ -75,9 +77,38 @@ const LecturerDashboard = () => {
 
     const handleClassSelect = (classData) => {
         setSelectedClass(classData);
+        setIsClassLocked(classData.is_locked || false);
         fetchStudents(classData.class_id);
         fetchGradeComponents(classData.class_id);
         fetchGrades(classData.class_id);
+    };
+
+    const handleLockGrades = async (lock) => {
+        if (!selectedClass) return;
+        const endpoint = lock ? 'lock-grades' : 'unlock-grades';
+        const confirm = window.confirm(lock ? 'Khoá điểm lớp này? Sau khi khoá không thể chỉnh sửa điểm!' : 'Mở khoá điểm lớp này?');
+        if (!confirm) return;
+        try {
+            const res = await fetch(`${API_BASE}/lecturer/classes/${selectedClass.class_id}/${endpoint}`, { method: 'POST' });
+            const data = await res.json();
+            setMessage(res.ok ? data.message : 'Lỗi: ' + data.error);
+            if (res.ok) setIsClassLocked(lock);
+        } catch { setMessage('Lỗi kết nối'); }
+    };
+
+    const handleChangePassword = async (e) => {
+        e.preventDefault();
+        if (pwForm.new_password !== pwForm.confirm_password) { setMessage('Mật khẩu mới không khớp!'); return; }
+        try {
+            const res = await fetch(`${API_BASE}/user/${user.id}/change-password`, {
+                method: 'PUT',
+                headers: { 'Content-Type': 'application/json' },
+                body: JSON.stringify({ old_password: pwForm.old_password, new_password: pwForm.new_password })
+            });
+            const data = await res.json();
+            setMessage(res.ok ? '✓ ' + data.message : '✗ ' + (data.message || data.error));
+            if (res.ok) setPwForm({ old_password: '', new_password: '', confirm_password: '' });
+        } catch { setMessage('Lỗi kết nối'); }
     };
 
     const handleGradeSubmit = async (e) => {
@@ -136,6 +167,7 @@ const LecturerDashboard = () => {
                 <button onClick={() => setActiveTab('schedule')} className={activeTab === 'schedule' ? 'active' : ''}>Lịch giảng dạy</button>
                 <button onClick={() => setActiveTab('students')} className={activeTab === 'students' ? 'active' : ''}>Danh sách lớp</button>
                 <button onClick={() => setActiveTab('grades')} className={activeTab === 'grades' ? 'active' : ''}>Quản lý điểm</button>
+                <button onClick={() => setActiveTab('password')} className={activeTab === 'password' ? 'active' : ''}>🔑 Đổi Mật Khẩu</button>
             </nav>
 
             <main className="lecturer-content">
@@ -228,7 +260,19 @@ const LecturerDashboard = () => {
                                 <h3>{selectedClass.course_name} - {selectedClass.semester}</h3>
 
                                 <div className="grade-input-form">
-                                    <h4>Nhập/Chỉnh sửa điểm</h4>
+                                    <div style={{display:'flex',justifyContent:'space-between',alignItems:'center',marginBottom:'16px'}}>
+                                        <h4>Nhập/Chỉnh sửa điểm</h4>
+                                        <div>
+                                            {isClassLocked ? (
+                                                <span style={{display:'flex',alignItems:'center',gap:'8px'}}>
+                                                    <span style={{background:'#fef2f2',color:'#dc2626',padding:'6px 12px',borderRadius:'6px',fontWeight:600,fontSize:'0.88rem'}}>🔒 Điểm đã bị khoá</span>
+                                                    <button onClick={()=>handleLockGrades(false)} style={{background:'#f59e0b',color:'white',border:'none',padding:'6px 14px',borderRadius:'6px',cursor:'pointer',fontWeight:600,fontSize:'0.85rem'}}>🔓 Mở Khoá</button>
+                                                </span>
+                                            ) : (
+                                                <button onClick={()=>handleLockGrades(true)} style={{background:'#dc2626',color:'white',border:'none',padding:'6px 14px',borderRadius:'6px',cursor:'pointer',fontWeight:600,fontSize:'0.85rem'}}>🔒 Khoá Điểm Lớp</button>
+                                            )}
+                                        </div>
+                                    </div>
                                     <form onSubmit={handleGradeSubmit}>
                                         <select 
                                             value={gradeForm.enrollment_id} 
@@ -321,6 +365,23 @@ const LecturerDashboard = () => {
                                 </div>
                             </>
                         )}
+                    </div>
+                )}
+
+                {activeTab === 'password' && (
+                    <div className="section">
+                        <h2>🔑 Đổi Mật Khẩu</h2>
+                        <div style={{maxWidth:'480px'}}>
+                            <form onSubmit={handleChangePassword}>
+                                <div style={{marginBottom:'16px'}}><label style={{display:'block',marginBottom:'6px',fontWeight:600}}>Mật khẩu hiện tại</label>
+                                    <input type="password" value={pwForm.old_password} onChange={e=>setPwForm({...pwForm,old_password:e.target.value})} required placeholder="Nhập mật khẩu hiện tại" style={{width:'100%',padding:'10px 14px',borderRadius:'8px',border:'1.5px solid #e5e7eb',fontSize:'0.95rem',boxSizing:'border-box'}} /></div>
+                                <div style={{marginBottom:'16px'}}><label style={{display:'block',marginBottom:'6px',fontWeight:600}}>Mật khẩu mới</label>
+                                    <input type="password" value={pwForm.new_password} onChange={e=>setPwForm({...pwForm,new_password:e.target.value})} required placeholder="Nhập mật khẩu mới" style={{width:'100%',padding:'10px 14px',borderRadius:'8px',border:'1.5px solid #e5e7eb',fontSize:'0.95rem',boxSizing:'border-box'}} /></div>
+                                <div style={{marginBottom:'24px'}}><label style={{display:'block',marginBottom:'6px',fontWeight:600}}>Xác nhận mật khẩu mới</label>
+                                    <input type="password" value={pwForm.confirm_password} onChange={e=>setPwForm({...pwForm,confirm_password:e.target.value})} required placeholder="Nhập lại mật khẩu mới" style={{width:'100%',padding:'10px 14px',borderRadius:'8px',border:'1.5px solid #e5e7eb',fontSize:'0.95rem',boxSizing:'border-box'}} /></div>
+                                <button type="submit" style={{background:'linear-gradient(135deg,#6366f1,#4f46e5)',color:'white',border:'none',padding:'12px 28px',borderRadius:'8px',fontWeight:600,fontSize:'1rem',cursor:'pointer'}}>🔑 Đổi Mật Khẩu</button>
+                            </form>
+                        </div>
                     </div>
                 )}
             </main>

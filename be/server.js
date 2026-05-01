@@ -14,7 +14,7 @@ app.use(cors());
 const pool = new Pool({
     user: 'postgres',
     host: 'localhost',
-    database: 'newsss',
+    database: 'newssss',
     password: '02032005',
     port: 5432,
 });
@@ -533,11 +533,20 @@ app.get('/lecturer/classes/:class_id/grade-components', async (req, res) => {
 app.post('/lecturer/grades', async (req, res) => {
     const { enrollment_id, component_id, score } = req.body;
     try {
+        // Kiểm tra lớp có bị khoá điểm không
+        const lockCheck = await pool.query(`
+            SELECT c.is_locked FROM enrollments e
+            JOIN classes c ON e.class_id = c.id
+            WHERE e.id = $1
+        `, [enrollment_id]);
+        if (lockCheck.rows.length > 0 && lockCheck.rows[0].is_locked) {
+            return res.status(400).json({ error: 'Điểm của lớp này đã bị khoá, không thể chỉnh sửa!' });
+        }
+
         // Kiểm tra xem đã có điểm chưa, nếu có thì UPDATE, chưa có thì INSERT
         const check = await pool.query(`SELECT id FROM grade_results WHERE enrollment_id = $1 AND component_id = $2`, [enrollment_id, component_id]);
 
         if (check.rows.length > 0) {
-            // DB Trigger trg_prevent_grade_update sẽ chặn nếu điểm đã bị khoá
             await pool.query(`UPDATE grade_results SET score = $1 WHERE id = $2`, [score, check.rows[0].id]);
         } else {
             await pool.query(`INSERT INTO grade_results(enrollment_id, component_id, score) VALUES($1, $2, $3)`, [enrollment_id, component_id, score]);
@@ -545,7 +554,6 @@ app.post('/lecturer/grades', async (req, res) => {
 
         res.json({ message: 'Grade updated successfully' });
     } catch (err) {
-        // Lỗi từ các DB Triggers (vd: "Điểm đã bị khóa!") sẽ được bắt ở đây
         res.status(400).json({ error: err.message });
     }
 });
@@ -715,33 +723,199 @@ app.get('/student/:id/grades', async (req, res) => {
 app.get('/student/:id/tuition', async (req, res) => {
     try {
         const result = await pool.query(`
-            SELECT se.code AS semester_code, t.total_amount, t.paid_amount, t.status, t.due_date
+            SELECT t.id, se.code AS semester_code, t.total_amount, t.paid_amount, t.status, t.due_date
             FROM tuition_invoices t
             JOIN semesters se ON t.semester_id = se.id
             WHERE t.student_id = $1
+            ORDER BY se.year DESC, se.code DESC
         `, [req.params.id]);
         res.json(result.rows);
     } catch (err) { res.status(500).json({ error: err.message }); }
 });
 
 /**
- * 7. Sinh viên tự thanh toán học phí (Giả lập)
- * Trigger trg_update_invoice tự động update trạng thái hoá đơn
+ * 7. Sinh viên thanh toán học phí — có validate đầy đủ
  */
 app.post('/student/pay', async (req, res) => {
     const { invoice_id, amount, payment_method } = req.body;
+
+    // --- Validate đầu vào ---
+    if (!invoice_id) return res.status(400).json({ error: 'Thiếu thông tin hoá đơn!' });
+    if (!amount || isNaN(Number(amount)) || Number(amount) <= 0)
+        return res.status(400).json({ error: 'Số tiền thanh toán phải lớn hơn 0!' });
+    if (!payment_method || payment_method.trim() === '')
+        return res.status(400).json({ error: 'Vui lòng chọn phương thức thanh toán!' });
+
+    const payAmount = Number(amount);
+
     try {
+        // --- Kiểm tra hoá đơn tồn tại ---
+        const invoiceRes = await pool.query(
+            'SELECT * FROM tuition_invoices WHERE id = $1',
+            [invoice_id]
+        );
+        if (invoiceRes.rows.length === 0)
+            return res.status(404).json({ error: 'Không tìm thấy hoá đơn!' });
+
+        const invoice = invoiceRes.rows[0];
+        const remaining = Number(invoice.total_amount) - Number(invoice.paid_amount);
+
+        // --- Kiểm tra đã thanh toán đủ chưa ---
+        if (invoice.status === 'paid' || remaining <= 0)
+            return res.status(400).json({ error: 'Hoá đơn này đã được thanh toán đầy đủ!' });
+
+        // --- Cảnh báo nếu số tiền vượt quá số còn nợ ---
+        if (payAmount > remaining)
+            return res.status(400).json({
+                error: `Số tiền vượt quá số còn nợ! Số tiền còn lại cần thanh toán là ${remaining.toLocaleString('vi-VN')} VND.`,
+                remaining
+            });
+
+        // --- Thực hiện thanh toán (trigger tự động cập nhật paid_amount & status) ---
         const result = await pool.query(
             `INSERT INTO payment_transactions(invoice_id, amount, payment_method, status) 
              VALUES($1, $2, $3, 'success') RETURNING *`,
-            [invoice_id, amount, payment_method]
+            [invoice_id, payAmount, payment_method]
         );
-        res.json({ message: 'Thanh toán thành công!', data: result.rows[0] });
+
+        // --- Lấy trạng thái hoá đơn mới nhất sau khi trigger chạy ---
+        const updatedInvoice = await pool.query(
+            'SELECT * FROM tuition_invoices WHERE id = $1',
+            [invoice_id]
+        );
+        const newStatus = updatedInvoice.rows[0]?.status;
+        const newPaid = updatedInvoice.rows[0]?.paid_amount;
+        const newRemaining = Number(invoice.total_amount) - Number(newPaid);
+
+        res.json({
+            message: newStatus === 'paid'
+                ? '✓ Thanh toán thành công! Hoá đơn đã được thanh toán đầy đủ.'
+                : `✓ Thanh toán thành công! Còn lại ${newRemaining.toLocaleString('vi-VN')} VND.`,
+            data: result.rows[0],
+            invoice_status: newStatus,
+            remaining: newRemaining
+        });
     } catch (err) {
         res.status(500).json({ error: err.message });
     }
 });
 
+/**
+ * 7b. Lấy lịch sử giao dịch của một hoá đơn
+ */
+app.get('/student/invoice/:invoice_id/transactions', async (req, res) => {
+    try {
+        const result = await pool.query(
+            `SELECT id, amount, payment_method, status, paid_at
+             FROM payment_transactions
+             WHERE invoice_id = $1
+             ORDER BY paid_at DESC`,
+            [req.params.invoice_id]
+        );
+        res.json(result.rows);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+
+/* =========================================================
+   🔑 CHANGE PASSWORD
+   ========================================================= */
+app.put('/user/:id/change-password', async (req, res) => {
+    const { old_password, new_password } = req.body;
+    try {
+        const userRes = await pool.query('SELECT * FROM users WHERE id = $1', [req.params.id]);
+        if (userRes.rows.length === 0) return res.status(404).json({ message: 'User not found' });
+        if (userRes.rows[0].password !== old_password) return res.status(400).json({ message: 'Mật khẩu cũ không đúng!' });
+        await pool.query('UPDATE users SET password = $1 WHERE id = $2', [new_password, req.params.id]);
+        res.json({ message: 'Đổi mật khẩu thành công!' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+/* =========================================================
+   🔒 LOCK GRADES FOR A CLASS
+   ========================================================= */
+app.post('/lecturer/classes/:class_id/lock-grades', async (req, res) => {
+    try {
+        const result = await pool.query('UPDATE classes SET is_locked = true WHERE id = $1 RETURNING *', [req.params.class_id]);
+        if (result.rows.length === 0) return res.status(404).json({ message: 'Class not found' });
+        res.json({ message: 'Đã khoá điểm lớp thành công!' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+app.post('/lecturer/classes/:class_id/unlock-grades', async (req, res) => {
+    try {
+        const result = await pool.query('UPDATE classes SET is_locked = false WHERE id = $1 RETURNING *', [req.params.class_id]);
+        if (result.rows.length === 0) return res.status(404).json({ message: 'Class not found' });
+        res.json({ message: 'Đã mở khoá điểm lớp!' });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+/* =========================================================
+   📊 ADMIN STATS
+   ========================================================= */
+app.get('/admin/stats', async (req, res) => {
+    try {
+        const [students, lecturers, classes, openClasses, revenue] = await Promise.all([
+            pool.query('SELECT COUNT(*) FROM students'),
+            pool.query('SELECT COUNT(*) FROM lecturers'),
+            pool.query('SELECT COUNT(*) FROM classes'),
+            pool.query("SELECT COUNT(*) FROM classes WHERE status = 'open'"),
+            pool.query('SELECT COALESCE(SUM(total_amount),0) AS total, COALESCE(SUM(paid_amount),0) AS paid FROM tuition_invoices'),
+        ]);
+        res.json({
+            total_students: parseInt(students.rows[0].count),
+            total_lecturers: parseInt(lecturers.rows[0].count),
+            total_classes: parseInt(classes.rows[0].count),
+            open_classes: parseInt(openClasses.rows[0].count),
+            total_revenue: parseFloat(revenue.rows[0].total),
+            paid_revenue: parseFloat(revenue.rows[0].paid),
+        });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+/* =========================================================
+   🎓 STUDENT GPA / TRANSCRIPT
+   ========================================================= */
+app.get('/student/:id/gpa', async (req, res) => {
+    try {
+        const result = await pool.query(`
+            SELECT co.name AS course_name, co.course_code, co.credits,
+                   fg.total_score, fg.letter_grade, fg.is_passed,
+                   se.code AS semester_code, se.year
+            FROM enrollments e
+            JOIN classes c ON e.class_id = c.id
+            JOIN courses co ON c.course_id = co.id
+            JOIN semesters se ON c.semester_id = se.id
+            LEFT JOIN final_grades fg ON e.id = fg.enrollment_id
+            WHERE e.student_id = $1 AND e.status != 'dropped'
+            ORDER BY se.year, se.code, co.course_code
+        `, [req.params.id]);
+
+        const gradePoints = { 'A+': 4.0, 'A': 4.0, 'B+': 3.5, 'B': 3.0, 'C+': 2.5, 'C': 2.0, 'D+': 1.5, 'D': 1.0, 'F': 0.0 };
+        let totalCredits = 0, totalPoints = 0;
+        result.rows.forEach(r => {
+            if (r.letter_grade && r.credits) {
+                const pts = gradePoints[r.letter_grade] ?? 0;
+                totalCredits += Number(r.credits);
+                totalPoints += pts * Number(r.credits);
+            }
+        });
+        const gpa = totalCredits > 0 ? (totalPoints / totalCredits).toFixed(2) : null;
+        res.json({ transcript: result.rows, gpa, total_credits: totalCredits });
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
+
+/* =========================================================
+   🔄 UPDATE CLASS STATUS
+   ========================================================= */
+app.put('/admin/classes/:id/status', async (req, res) => {
+    const { status } = req.body;
+    try {
+        const result = await pool.query('UPDATE classes SET status = $1 WHERE id = $2 RETURNING *', [status, req.params.id]);
+        if (result.rows.length === 0) return res.status(404).json({ message: 'Class not found' });
+        res.json(result.rows[0]);
+    } catch (err) { res.status(500).json({ error: err.message }); }
+});
 
 /* =========================
    🚀 START SERVER
